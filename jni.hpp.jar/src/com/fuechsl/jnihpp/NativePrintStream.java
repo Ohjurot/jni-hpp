@@ -40,10 +40,10 @@ public class NativePrintStream extends PrintStream {
 	 * Native std::cout (Can be hooked in a custom jni::JavaVM implementation)
 	 * @param message Message to print
 	 */
-	public static native void NStdOut(long instanceid, String message);
+	private static native void NStdOut(long instanceid, String message);
 	/***
 	 * Native std::cerr (Can be hooked in a custom jni::JavaVM implementation)
 	 * @param message Message to print
 	 */
-	public static native void NStdErr(long instanceid, String message);
+	private static native void NStdErr(long instanceid, String message);
 }

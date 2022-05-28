@@ -184,6 +184,8 @@ namespace jni
         jmethodID JAVA_Mth_Setup_RunSetup = nullptr;
 
         jclass JAVA_Cls_NativePrintStream = nullptr;
+
+        jclass JAVA_Cls_NativeInputStream = nullptr;
     };
 
     // Class that interfaces with JNI (override this class)
@@ -280,10 +282,7 @@ namespace jni
 
         protected:
             // Virtual function called on vm start
-            virtual void SetupVM(jni::VMArguments& Args)
-            {
-
-            }
+            virtual void SetupVM(jni::VMArguments& Args) = 0;
             // Virtual function that is called when the class cannot be loaded by java
             // If ClassName is loaded by c++ code: Allocate memory for pointer "*ClassContent" and return size of allocated buffer (aka class content length)
             virtual jsize LoadClass(const std::string& ClassName, char** ClassContent)
@@ -299,6 +298,24 @@ namespace jni
             virtual void SystemErr(const char* Message)
             {
                 std::cerr << Message;
+            }
+            // Read single char (blocking)
+            virtual bool SystemIn(char* c)
+            {
+                // Check if can read and then set
+                int CharValue = getchar();
+                bool IsEOF = CharValue == EOF;
+                if (!IsEOF)
+                {
+                    *c = CharValue;
+                }
+
+                return !IsEOF;
+            }
+            // Checks if reading is possible
+            virtual bool SystemInCanRead()
+            {
+                return std::cin.rdbuf()->in_avail() > 0;
             }
 
         private:
@@ -328,6 +345,9 @@ namespace jni
                 // === com.fuechsl.jnihpp.NativePrintStream ===
                 __JNIHPP_JNI_LOAD_AND_CHECK(jvt.JAVA_Cls_NativePrintStream, JNIEnv->FindClass("com/fuechsl/jnihpp/NativePrintStream"));
 
+                // === com.fuechsl.jnihpp.NativeInputStream ===
+                __JNIHPP_JNI_LOAD_AND_CHECK(jvt.JAVA_Cls_NativeInputStream, JNIEnv->FindClass("com/fuechsl/jnihpp/NativeInputStream"));
+
                 // OK
                 return true;
             }
@@ -347,16 +367,28 @@ namespace jni
                 __JNIHPP_JNI_CHECK_RESULT(JNIEnv->RegisterNatives(jvt.JAVA_Cls_ClassLoader, &NativeFunctions[0], 1));
 
                 // === com.fuechs.jnihpp.NativePrintStream ===
-                // Functions for class loading by C++
+                // System.out.* callback
                 NativeFunctions[0].name = (char*)"NStdOut";
                 NativeFunctions[0].signature = (char*)"(JLjava/lang/String;)V";
                 NativeFunctions[0].fnPtr = &JAVA_NStdOut;
-                // Functions for class loading by C++
+                // System.err.* callback
                 NativeFunctions[1].name = (char*)"NStdErr";
                 NativeFunctions[1].signature = (char*)"(JLjava/lang/String;)V";
                 NativeFunctions[1].fnPtr = &JAVA_NStdErr;
                 // Register natives (call)
                 __JNIHPP_JNI_CHECK_RESULT(JNIEnv->RegisterNatives(jvt.JAVA_Cls_NativePrintStream, &NativeFunctions[0], 2));
+
+                // === com.fuechs.jnihpp.NativeInputStream ===
+                // System.in.* callback READ
+                NativeFunctions[0].name = (char*)"NReadByte";
+                NativeFunctions[0].signature = (char*)"(J)I";
+                NativeFunctions[0].fnPtr = &JAVA_NReadByte;
+                // System.in.* callback CANREAD
+                NativeFunctions[1].name = (char*)"NCanRead";
+                NativeFunctions[1].signature = (char*)"(J)Z";
+                NativeFunctions[1].fnPtr = &JAVA_NCanRead;
+                // Register natives (call)
+                __JNIHPP_JNI_CHECK_RESULT(JNIEnv->RegisterNatives(jvt.JAVA_Cls_NativeInputStream, &NativeFunctions[0], 2));
 
                 // OK
                 return true;
@@ -461,6 +493,31 @@ namespace jni
                     // Release message
                     JAVA_Env->ReleaseStringUTFChars(JAVA_Message, Message);
                 }
+            }
+            // Callback for std::cin
+            static jint JAVA_NReadByte(JNIEnv* JAVA_Env, jobject JAVA_This, jlong JAVA_InstanceRef)
+            {
+                // Convert to instance pointer
+                JavaVM* Interface = (JavaVM*)JAVA_InstanceRef;
+
+                // Call virtual function to get a char
+                jint JavaReturn = -1;
+                unsigned char Value = 0x00;
+                if (Interface->SystemIn((char*)&Value))
+                {
+                    JavaReturn = Value;
+                }
+
+                return JavaReturn;
+            }
+            // Callback for checking std::cin
+            static jboolean JAVA_NCanRead(JNIEnv* JAVA_Env, jobject JAVA_This, jlong JAVA_InstanceRef)
+            {
+                // Convert to instance pointer
+                JavaVM* Interface = (JavaVM*)JAVA_InstanceRef;
+
+                // Call virtual function with nullptr to get if reading is possible
+                return Interface->SystemInCanRead();
             }
 
         private:

@@ -25,5 +25,9 @@ public class Setup {
 		nativeStderr.type = NativeStreamType.ErrorStream;
 		nativeStderr.instanceid = instanceID;
 		System.setErr(nativeStderr);
+		
+		// Redirect stdin
+		NativeInputStream nativeStdin = new NativeInputStream(instanceID);
+		System.setIn(nativeStdin);	
 	}
 }
